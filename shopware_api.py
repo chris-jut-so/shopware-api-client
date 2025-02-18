@@ -3,11 +3,7 @@ import json
 from typing import Dict, List, Optional
 from datetime import datetime
 import base64
-import os
-from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
 
 class ShopwareAdminAPI:
     def __init__(self, access_key: str, secret_key: str, api_url: str):
@@ -96,30 +92,45 @@ class ShopwareAdminAPI:
         
         return response.json()
 
-
-def main():
-    # Get configuration from environment variables
-    access_key = os.getenv('SHOPWARE_ACCESS_KEY')
-    secret_key = os.getenv('SHOPWARE_SECRET_KEY')
-    api_url = os.getenv('SHOPWARE_API_URL')
-
-    # Validate environment variables
-    if not all([access_key, secret_key, api_url]):
-        raise ValueError("Missing required environment variables. Please check your .env file.")
-    
-    # Initialize API client
-    api_client = ShopwareAdminAPI(access_key, secret_key, api_url)
-    
-    try:
-        # Get products
-        products = api_client.get_products(limit=1, page=1)
+    def update_product(self, product_id: str, data: Dict) -> Dict:
+        """
+        Update a product with the given data.
         
-        # Print results
-        print("Retrieved products:")
-        print(json.dumps(products, indent=2))
+        Args:
+            product_id (str): The ID of the product to update
+            data (Dict): The data to update. Only include fields that need to be updated.
+                        Example: {"name": "New Name", "active": True}
         
-    except requests.exceptions.RequestException as e:
-        print(f"Error occurred while fetching products: {e}")
-
-if __name__ == "__main__":
-    main() 
+        Returns:
+            Dict: Status information about the update
+        
+        Raises:
+            requests.exceptions.RequestException: If the API request fails
+        """
+        url = f"{self.api_url}/api/product/{product_id}"
+        
+        response = requests.patch(
+            url,
+            headers=self._get_headers(),
+            json=data
+        )
+        
+        response.raise_for_status()
+        
+        # Shopware returns 204 No Content on successful updates
+        if response.status_code == 204:
+            return {
+                "success": True,
+                "message": "Product updated successfully",
+                "product_id": product_id
+            }
+            
+        # In case the API changes and returns content
+        try:
+            return response.json()
+        except json.JSONDecodeError:
+            return {
+                "success": True,
+                "message": "Product updated successfully (no content)",
+                "product_id": product_id
+            } 
